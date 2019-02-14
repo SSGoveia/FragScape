@@ -40,7 +40,7 @@ from .algs.meff_algs import MeffAlgorithmsProvider
 from .algs.meff_global_alg import FragScapeAlgorithm
 from .steps import params, landuse, fragm, reporting
 from . import tabs
-from .FragScape_model import FragScapeModel
+from .FragScape_model import FragScapeModel, FragScapeConnector
 
 #from MeffAbout_dialog import MeffAboutDialog
 
@@ -65,37 +65,36 @@ class MeffDialog(QtWidgets.QDialog, FORM_CLASS):
         self.setupUi(self)
 
     def initTabs(self):
-        global progressFeedback
-        logConnector = log.LogConnector(self)
-        logConnector.initGui()
-        self.feedback =  progress.ProgressFeedback(self)
-        progress.progressFeedback = self.feedback
-        utils.debug("progressFeedback = " + str(progress.progressFeedback))
-        self.context = QgsProcessingContext()
-        self.context.setFeedback(progress.progressFeedback)
-        self.fsModel = FragScapeModel(self.context,progress.progressFeedback)
-        self.paramsConnector = params.ParamsConnector(self,self.fsModel.paramsModel)
-        #params.params = self.paramsConnector.model
-        self.landuseConnector = landuse.LanduseConnector(self,self.fsModel.landuseModel)
-        #landuse.landuseModel = self.landuseConnector.model
-        self.fragmConnector = fragm.FragmConnector(self,self.fsModel.fragmModel)
-        #fragm.fragmModel = self.fragmConnector.model
-        self.reportingConnector = reporting.ReportingConnector(self,self.fsModel.reportingModel)
-        # progressConnector = progress.ProgressConnector(self)
-        # progress.progressConnector = progressConnector
-        tabConnector = tabs.TabConnector(self)
-        self.connectors = {"Params" : self.paramsConnector,
-                           "Log" : logConnector,
-                           "Landuse" : self.landuseConnector,
-                           "Fragm" : self.fragmConnector,
-                           "Reporting" : self.reportingConnector,
-                           "Progress" : progress.progressFeedback,
-                           "Tabs" : tabConnector}
-        self.recomputeParsers()
+        self.fsConnector = FragScapeConnector(self)
+        self.fsModel = self.fsConnector.fsModel
+        self.feedback = self.fsConnector.feedback
+        self.context = self.fsConnector.context
+        # global progressFeedback
+        # logConnector = log.LogConnector(self)
+        # logConnector.initGui()
+        # self.feedback =  progress.ProgressFeedback(self)
+        # progress.progressFeedback = self.feedback
+        # utils.debug("progressFeedback = " + str(progress.progressFeedback))
+        # self.context = QgsProcessingContext()
+        # self.context.setFeedback(progress.progressFeedback)
+        # self.fsModel = FragScapeModel(self.context,progress.progressFeedback)
+        # self.paramsConnector = params.ParamsConnector(self,self.fsModel.paramsModel)
+        # self.landuseConnector = landuse.LanduseConnector(self,self.fsModel.landuseModel)
+        # self.fragmConnector = fragm.FragmConnector(self,self.fsModel.fragmModel)
+        # self.reportingConnector = reporting.ReportingConnector(self,self.fsModel.reportingModel)
+        # tabConnector = tabs.TabConnector(self)
+        # self.connectors = {"Params" : self.paramsConnector,
+                           # "Log" : logConnector,
+                           # "Landuse" : self.landuseConnector,
+                           # "Fragm" : self.fragmConnector,
+                           # "Reporting" : self.reportingConnector,
+                           # "Progress" : progress.progressFeedback,
+                           # "Tabs" : tabConnector}
+        # self.recomputeParsers()
         
     def initGui(self):
         QgsApplication.processingRegistry().addProvider(self.provider)
-        for k, tab in self.connectors.items():
+        for tab in self.fsConnector.connectors:
             tab.initGui()
         
     # Exception hook, i.e. function called when exception raised.
@@ -125,7 +124,7 @@ class MeffDialog(QtWidgets.QDialog, FORM_CLASS):
     # Connects view and model components for each tab.
     # Connects global elements such as project file and language management.
     def connectComponents(self):
-        for k, tab in self.connectors.items():
+        for tab in self.fsConnector.connectors:
             tab.connectComponents()
         utils.debug("progressFeedback cc = " + str(progress.progressFeedback))
         utils.debug("progressFeedback cc type = " + str(type(progress.progressFeedback)))
@@ -174,7 +173,7 @@ class MeffDialog(QtWidgets.QDialog, FORM_CLASS):
             utils.warn("No translation file : " + str(en_path))
         self.retranslateUi(self)
         utils.curr_language = lang
-        self.connectors["Tabs"].loadHelpFile()
+        self.fsConnector.tabConnector.loadHelpFile()
         
     def switchLangEn(self):
         self.switchLang("en")
@@ -186,15 +185,7 @@ class MeffDialog(QtWidgets.QDialog, FORM_CLASS):
         utils.debug("openHelpDialog")
         about_dlg = MeffAboutDialog(self)
         about_dlg.show()
-        
-    
-    # Recompute self.parsers in case they have been reloaded
-    def recomputeParsers(self):
-        self.parsers = [self.paramsConnector,
-                        self.landuseConnector,
-                        self.fragmConnector.model,
-                        self.reportingConnector]
-        
+                
         # Return XML string describing project
     def toXML(self):
         # xmlStr = "<MeffConfig>\n"
@@ -207,7 +198,7 @@ class MeffDialog(QtWidgets.QDialog, FORM_CLASS):
 
     # Save project to 'fname'
     def saveModelAs(self,fname):
-        self.recomputeParsers()
+        self.fsConnector.recomputeParsers()
         xmlStr = self.fsModel.toXML()
         #params.params.projectFile = fname
         self.fsModel.paramsModel.projectFile = fname
@@ -230,7 +221,7 @@ class MeffDialog(QtWidgets.QDialog, FORM_CLASS):
     def loadModel(self,fname):
         utils.debug("loadModel " + str(fname))
         utils.checkFileExists(fname)
-        config_parsing.setConfigParsers(self.parsers)
+        config_parsing.setConfigParsers(self.fsConnector.parsers)
         #params.params.projectFile = fname
         #xml_tree = ET.parse(fname)
         #xml_root = xml_tree.getroot()

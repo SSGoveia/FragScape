@@ -100,6 +100,7 @@ class FragmModel(abstract_model.DictModel):
     def __init__(self,fsModel):
         self.parser_name = "FragmModel"
         self.fsModel = fsModel
+        self.final_layer = None
         super().__init__(self,self.FIELDS)
         
     def mkItemFromDict(self,dict):
@@ -126,7 +127,6 @@ class FragmModel(abstract_model.DictModel):
         return QgsProcessingUtils.generateTempFilename("landuseFragm.gpkg")
         
     def getFinalLayer(self):
-        #return self.fsModel.mkOutputFile("landuseFragmSingleGeom.gpkg")
         return self.fsModel.mkOutputFile("landuseFragmSingleGeom.gpkg")
         
     # def applyItemsOld(self,indexes):
@@ -227,9 +227,10 @@ class FragmModel(abstract_model.DictModel):
         
 class FragmConnector(abstract_model.AbstractConnector):
 
-    def __init__(self,dlg,fragmModel):
+    def __init__(self,dlg,fragmModel,fsConnector):
         self.parser_name = "FragmConnector"
         self.dlg = dlg
+        self.fsConnector = fsConnector
         #fragmModel = FragmModel()
         self.onlySelection = False
         self.dataClipFlag = False
@@ -252,11 +253,13 @@ class FragmConnector(abstract_model.AbstractConnector):
         self.dlg.fragmClipLayer.fileChanged.connect(self.setDataClipLayer)
         
     def applyItems(self):
-        self.dlg.resultsInputLayer.setLayer(None)
-        self.dlg.resultsSelection.setLayer(None)
-        #super().applyItems()
+        #self.fsConnector.reportingConnector.unloadResults()
+        #self.dlg.resultsInputLayer.setLayer(None)
+        #self.dlg.resultsSelection.setLayer(None)
+        super().applyItems()
         res_path = self.model.getFinalLayer()
         res_layer = qgsUtils.loadVectorLayer(res_path)
+        utils.debug("setting resultsInputLauer to " + str(res_path))
         self.dlg.resultsInputLayer.setLayer(res_layer)
         
     def setInLayerFromCombo(self,layer):

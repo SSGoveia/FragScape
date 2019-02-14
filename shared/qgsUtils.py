@@ -99,6 +99,7 @@ def getLayerByFilename(fname):
         if fname_parts == path_parts:
             return layer
     else:
+        utils.debug("Could not find layer : " + str(fname))
         return None
        
 def isLayerLoaded(fname):
@@ -337,9 +338,7 @@ class LayerComboDialog:
         if fname:
             self.layer_name = fname
             self.layer = loadVectorLayer(fname,loadProject=True)
-            utils.debug("self.layer = " +str(self.layer))
             self.combo.setLayer(self.layer)
-            #self.combo.layerChanged.emit(self.layer)
         else:
             utils.user_error("Could not open file " + str(fname))
         

@@ -57,13 +57,9 @@ class ReportingModel(abstract_model.DictModel):
         self.init_fields = []
         self.fields = self.init_fields
         super().__init__(self,self.fields)
-        #super().__init__(self,self.fields)
                 
     def getInputLayer(self):
         return self.fsModel.fragmModel.getFinalLayer()
-        # if not self.input_layer:
-            # self.input_layer = self.fsModel.fragmModel.getFinalLayer()
-        # return self.input_layer
                 
     def setOutLayer(self,layer):
         self.out_layer = layer
@@ -88,9 +84,10 @@ class ReportingModel(abstract_model.DictModel):
         progress.progressFeedback.beginSection(reportingMsg)
         input_layer = self.getInputLayer()
         if self.select_expr:
-            selected = qgsTreatments.extractByExpression(
-                input_layer,self.select_expr,'memory:',
-                context=context,feedback=feedback)
+            select_path = QgsProcessingUtils.generateTempFilename("reportingSelection.gpkg")
+            qgsTreatments.extractByExpression(
+                input_layer,self.select_expr,select_path)
+            selected = select_path
         else:
             selected = input_layer
         crs = self.fsModel.paramsModel.crs
@@ -103,24 +100,19 @@ class ReportingModel(abstract_model.DictModel):
         else:
             utils.internal_error("Unepexted method : " + str(self.method))
         parameters = { meff_algs.EffectiveMeshSizeAlgorithm.INPUT : selected,
-                       #meff_algs.EffectiveMeshSizeAlgorithm.REPORTING : qgsUtils.pathOfLayer(self.layer),
                        meff_algs.EffectiveMeshSizeAlgorithm.REPORTING : self.reporting_layer,
                        meff_algs.EffectiveMeshSizeAlgorithm.CRS : crs,
                        meff_algs.EffectiveMeshSizeAlgorithm.CUT_MODE : cut_mode,
                        meff_algs.EffectiveMeshSizeAlgorithm.OUTPUT : results_path }
         res = qgsTreatments.applyProcessingAlg(
-            "Meff","effectiveMeshSize",parameters,
-            context=context,feedback=feedback,onlyOutput=False)
+           "Meff","effectiveMeshSize",parameters,
+           context=context,feedback=feedback,onlyOutput=False)
         out_path = res[meff_algs.EffectiveMeshSizeAlgorithm.OUTPUT]
         qgsUtils.loadVectorLayer(out_path,loadProject=True)
         progress.progressFeedback.endSection()
         return res
                 
     def toXML(self,indent=" "):
-        # if not self.reporting_layer:
-            # utils.warn("No reporting layer selected")
-            # return ""
-        #layerRelPath = self.fsModel.normalizePath(qgsUtils.pathOfLayer(self.layer))
         modelParams = {}
         # if self.input_layer:
             # pass
@@ -155,8 +147,6 @@ class ReportingConnector(abstract_model.AbstractConnector):
     def __init__(self,dlg,reportingModel):
         self.dlg = dlg
         self.parser_name = "Reporting"
-        #self.model = reportingModel
-        #reportingModel = ReportingModel()
         super().__init__(reportingModel,self.dlg.resultsView)
         
     def initGui(self):
@@ -192,15 +182,16 @@ class ReportingConnector(abstract_model.AbstractConnector):
         self.attribute_model = QgsAttributeTableModel(self.layer_cache)
         self.attribute_model.loadLayer()
         self.dlg.resultsView.setModel(self.attribute_model)
-        #self.dlg.resultsView.show()
+        self.dlg.resultsView.show()
         
     def unloadResults(self):
+        self.dlg.resultsInputLayer.setLayer(None)
+        self.dlg.resultsSelection.setLayer(None)
         self.dlg.resultsGlobalRes.setText(str(0))
-        self.loaded_layer = None
-        self.layer_cache = None
-        self.attribute_model = None
-        #self.model.items = []
-        self.dlg.resultsView.setModel(None)
+        # self.loaded_layer = None
+        # self.layer_cache = None
+        # self.attribute_model = None
+        # self.dlg.resultsView.setModel(None)
         
         
     # def setLayer(self,layer):
@@ -235,11 +226,12 @@ class ReportingConnector(abstract_model.AbstractConnector):
         #self.setLayer(loaded_layer)
         
     def updateUI(self):
+        utils.debug("update ui reporting")
         abs_input_layer = self.model.getInputLayer()
-        utils.debug("")
         if os.path.isfile(abs_input_layer):
             loaded_layer = qgsUtils.loadVectorLayer(abs_input_layer,loadProject=True)
             self.dlg.resultsInputLayer.setLayer(loaded_layer)
+            self.dlg.resultsSelection.setLayer(loaded_layer)
         else:
             utils.warn("Could not find results input layer : " + str(abs_input_layer))
         if self.model.select_expr:

@@ -22,8 +22,11 @@
  ***************************************************************************/
 """
 
-from .shared import utils
+from qgis.core import QgsProcessingContext
+
+from .shared import utils, progress, log
 from .steps import params, landuse, fragm,  reporting
+from . import tabs
 
 class FragScapeModel:
 
@@ -88,4 +91,42 @@ class FragScapeModel:
                 self.reportingModel.fromXMLRoot(child)
                 self.reportingModel.layoutChanged.emit()
         
+        
+class FragScapeConnector:
+
+    def __init__(self,dlg):
+        global progressFeedback
+        self.dlg = dlg
+        # Log connector must be instantiated first
+        self.logConnector = log.LogConnector(self.dlg)
+        self.logConnector.initGui()
+        # Context and feedback initializations
+        self.feedback =  progress.ProgressFeedback(self.dlg)
+        progress.progressFeedback = self.feedback
+        utils.debug("progressFeedback = " + str(progress.progressFeedback))
+        self.context = QgsProcessingContext()
+        self.context.setFeedback(progress.progressFeedback)
+        # Model initialization
+        self.fsModel = FragScapeModel(self.context,progress.progressFeedback)
+        self.paramsConnector = params.ParamsConnector(self.dlg,self.fsModel.paramsModel)
+        self.landuseConnector = landuse.LanduseConnector(self.dlg,self.fsModel.landuseModel)
+        self.fragmConnector = fragm.FragmConnector(self.dlg,self.fsModel.fragmModel,self)
+        self.reportingConnector = reporting.ReportingConnector(self.dlg,self.fsModel.reportingModel)
+        self.tabConnector = tabs.TabConnector(self.dlg)
+        self.connectors = [ self.logConnector,
+                            self.paramsConnector,
+                            self.landuseConnector,
+                            self.fragmConnector,
+                            self.reportingConnector,
+                            self.feedback,
+                            self.tabConnector]
+        self.recomputeParsers()
+        
+        
+    # Recompute self.parsers in case they have been reloaded
+    def recomputeParsers(self):
+        self.parsers = [self.paramsConnector,
+                        self.landuseConnector,
+                        self.fragmConnector.model,
+                        self.reportingConnector]
     
